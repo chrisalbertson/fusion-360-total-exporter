@@ -1,5 +1,10 @@
-#Author-Justin Nesselrotte
-#Description-A convenient way to export all of your designs and projects in the event you suddenly find yourself in need of something like that.
+"""
+Export all of your Fusion 360 designs and projects.
+
+Author: Justin Nesselrotte
+        Chris Albertson
+"""
+
 from __future__ import with_statement
 
 import adsk.core, adsk.fusion, adsk.cam, traceback
@@ -11,6 +16,12 @@ import time
 import os
 import re
 
+# TODO THese need to be set with command line arguments
+outputSTEP = True
+outputIGES = False
+outputSTL  = False
+outputDXF  = False
+startProject = 0
 
 
 class TotalExport(object):
@@ -31,9 +42,9 @@ class TotalExport(object):
 
   def run(self, context):
     self.ui.messageBox(
-      "Searching for and exporting files will take a while, depending on how many files you have.\n\n" \
-        "You won't be able to do anything else. It has to do everything in the main thread and open and close every file.\n\n" \
-          "Take an early lunch."
+      "Searching for and exporting files will take a while, depending on how many files you have.\n" \
+      "You won't be able to do anything else. It has to do everything in the main thread and open and close every file.\n" \
+      "Take an early lunch."
       )
 
     output_path = self._ask_for_output_path()
@@ -72,7 +83,7 @@ class TotalExport(object):
       self.log.info("Exporting hub \"{}\"".format(hub.name))
 
       all_projects = hub.dataProjects
-      for project_index in range(all_projects.count):
+      for project_index in range(startProject, all_projects.count, 1):
         files = []
         project = all_projects.item(project_index)
         self.log.info("Exporting project \"{}\"".format(project.name))
@@ -203,21 +214,30 @@ class TotalExport(object):
     
     output_path = os.path.join(component_base_path, self._name(component.name))
 
-    self._write_step(output_path, component)
-    self._write_stl(output_path, component)
-    self._write_iges(output_path, component)
+    if outputSTEP:
+      self._write_step(output_path, component)
+      
+    if outputSTL:  
+      self._write_stl(output_path, component)
+      
+    if outputIGES:  
+      self._write_iges(output_path, component)
 
-    sketches = component.sketches
-    for sketch_index in range(sketches.count):
-      sketch = sketches.item(sketch_index)
-      self._write_dxf(os.path.join(output_path, sketch.name), sketch)
+    if outputDXF:
+      sketches = component.sketches
+      for sketch_index in range(sketches.count):
+        sketch = sketches.item(sketch_index)
+        self._write_dxf(os.path.join(output_path, sketch.name), sketch)
 
     occurrences = component.occurrences
     for occurrence_index in range(occurrences.count):
-      occurrence = occurrences.item(occurrence_index)
-      sub_component = occurrence.component
-      sub_path = self._take(component_base_path, self._name(component.name))
-      self._write_component(sub_path, sub_component)
+      try:
+        occurrence = occurrences.item(occurrence_index)
+        sub_component = occurrence.component
+        sub_path = self._take(component_base_path, self._name(component.name))
+        self._write_component(sub_path, sub_component)
+      except:
+        self.log.exception("Failed writing component", sub_path, sub_component)
 
   def _write_step(self, output_path, component: adsk.fusion.Component):
     file_path = output_path + ".stp"
